@@ -151,7 +151,7 @@ async function checkSynthId(env: Env, image: { bytes: Uint8Array; mime: string }
   const extension = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }[
     image.mime as "image/png" | "image/jpeg" | "image/webp"
   ];
-  form.append("file", new Blob([image.bytes], { type: image.mime }), `image.${extension}`);
+  form.append("file", new Blob([image.bytes.buffer as ArrayBuffer], { type: image.mime }), `image.${extension}`);
 
   const response = await fetch("https://api.openai.com/v1/content_provenance_checks", {
     method: "POST",
