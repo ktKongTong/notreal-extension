@@ -1,0 +1,9 @@
+{
+  "name": "notreal-detect",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-27",
+  "ai": { "binding": "AI" },
+  "kv_namespaces": [
+    { "binding": "CACHE", "id": "00000000000000000000000000000000" }
+  ]
+}
