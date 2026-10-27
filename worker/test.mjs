@@ -38,7 +38,6 @@ const request = () => new Request("https://notreal.test/detect", {
 const image = () => new Response(new Uint8Array([137, 80, 78, 71, 1]), {
   headers: { "content-type": "image/png" },
 });
-
 test("rejects non-public URLs", async () => {
   const response = await handler.fetch(new Request("https://notreal.test/detect", {
     method: "POST",
@@ -46,7 +45,6 @@ test("rejects non-public URLs", async () => {
   }), env(0.9));
   assert.equal(response.status, 400);
 });
-
 test("stylized images skip SynthID and cache results for other users", async () => {
   const previous = globalThis.fetch;
   const calls = [];
@@ -69,7 +67,6 @@ test("stylized images skip SynthID and cache results for other users", async () 
     globalThis.fetch = previous;
   }
 });
-
 test("realistic images call OpenAI once and share detected watermark", async () => {
   const previous = globalThis.fetch;
   let synthidCalls = 0;
