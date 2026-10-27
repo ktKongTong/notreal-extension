@@ -50,8 +50,14 @@ it is a **runtime secret**, not a build secret, and must not be committed.
 
 After Cloudflare has deployed the revision, check
 `https://notreal-extension.koft.workers.dev/health`.
-The expected response is `{"ok":true}`. A `Hello world` response means the
+The expected response is `{"ok":true,"version":"diagnostics-v2"}`. A `Hello world` response means the
 Cloudflare dashboard starter Worker is still deployed, not this repository code.
+
+Errors now include `stage` and `requestId`. Look up the request ID in
+**Workers & Pages → notreal-extension → Observability → Logs**, filtering
+for `event: detection_error`. Logs are enabled at 100% sampling in Wrangler
+and omit request URLs and credentials. The response never exposes provider
+exception details; check the corresponding structured log for the cause.
 
 The Cloudflare account must have Workers AI enabled and the OpenAI API
 organization must have access to Content Provenance checks (404 can indicate
