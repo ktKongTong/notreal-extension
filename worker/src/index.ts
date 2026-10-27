@@ -70,11 +70,20 @@ async function cacheKey(url: URL): Promise<string> {
 }
 
 async function downloadImage(url: URL): Promise<{ bytes: Uint8Array; mime: string }> {
-  const response = await fetch(url.href, {
-    redirect: "manual",
-    headers: { Accept: "image/png,image/jpeg,image/webp" },
-  });
-  if (!response.ok) throw new HttpError(422, `image_fetch_http_${response.status}`);
+  let response: Response | undefined;
+  for (let hop = 0; hop <= 3; hop++) {
+    response = await fetch(url.href, {
+      redirect: "manual",
+      headers: { Accept: "image/png,image/jpeg,image/webp" },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    if (hop === 3) throw new HttpError(422, "image_redirect_limit");
+    const location = response.headers.get("location");
+    if (!location) throw new HttpError(422, "image_redirect_missing_location");
+    url = parseImageUrl(new URL(location, url).href);
+    await response.body?.cancel();
+  }
+  if (!response?.ok) throw new HttpError(422, `image_fetch_http_${response?.status}`);
 
   const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
   const mime = contentType === "image/jpg" ? "image/jpeg" : contentType;
