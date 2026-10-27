@@ -1,9 +1,9 @@
-[data-testid="tweetPhoto"].notreal-ai-photo {
+.notreal-ai-photo {
   outline: 2px solid rgba(245, 158, 11, 0.82);
   outline-offset: -2px;
 }
 
-[data-testid="tweetPhoto"] > .notreal-label {
+.notreal-ai-photo > .notreal-label {
   position: absolute;
   z-index: 10;
   right: 8px;
