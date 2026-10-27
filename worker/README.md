@@ -1,41 +1,9 @@
-# NotReal detection Worker
+# NotReal image detection Worker
 
-Single Cloudflare Worker; no login and no separate backend.
-
-## API
-
-`POST /detect` with `Content-Type: application/json`:
-
-```json
-{"imageUrl":"https://pbs.twimg.com/media/example.jpg"}
-```
-
-Returns `style.label`, `style.probability`, `synthid` (`detected`,
-`not_detected`, or `skipped`), `checkedAt`, and `cached`.
-`GET /health` returns `{"ok":true,"version":"diagnostics-v2"}`.
-
-## Pipeline
-
-- Accepts public HTTPS PNG/JPEG/WebP up to 4 MiB; follows at most 3 HTTPS
-  redirects, validating each destination.
-- Clef-flash uses the image bytes to classify realism (threshold 0.25).
-- Realistic images use OpenAI Content Provenance SynthID verification; this
-  is **not** universal AI detection. No watermark does not mean real.
-- KV caches detections for 7 days by the initial image URL hash. Shared by
-  anonymous users; changes behind the same URL are not automatically refreshed.
-
-## Cloudflare Git deployment
-
-Connect `ktKongTong/notreal-extension` (branch `main`) in Workers Builds.
-Set **Root directory** to `worker`, **Build command** empty, and
-**Deploy command** to `npx wrangler deploy`. No GitHub Actions is required.
-The Wrangler config supplies the Worker name, AI and KV bindings, and declares
-`OPENAI_API_KEY` as a required **runtime Secret**. Set its encrypted value in
-**Worker → Settings → Variables and Secrets**, not in Git.
-
-Deploy and check `https://notreal-extension.koft.workers.dev/health`.
-For failures, use `stage` and `requestId` from the JSON response to find
-`detection_error` in **Worker → Observability → Logs**. Set rate limits on
-this public endpoint to protect your AI/API quotas.
-
-Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+`POST /detect` with JSON `{"imageUrl":"https://example.com/photo.jpg"}`; `GET /health` checks deployment. Response includes `style`, `synthid`, `checkedAt`, `cached`.
+Accepts public HTTPS images up to 4 MiB and 3 redirects; checks actual PNG/JPEG/WebP bytes, not just `Content-Type`. If the CDN serves HTML or an unsupported format, the error includes its MIME type.
+Cloudflare Clef-flash scores realism (0.25 threshold). Realistic images use OpenAI's Content Provenance SynthID check; `not_detected` does NOT prove an image is real.
+Results are shared across anonymous users via 7-day Workers KV cache, keyed by the original image URL.
+Cloudflare Workers Builds: connect `ktKongTong/notreal-extension` (`main`), set root directory `worker`, leave build command empty, deploy with `npx wrangler deploy`. No GitHub Actions.
+Bindings: `AI`, KV `CACHE` (`4022b3395e914b438eeea28ab6646845`), and the required runtime secret `OPENAI_API_KEY`. Set the key under Worker Settings → Variables and Secrets; never commit it.
+Check `https://notreal-extension.koft.workers.dev/health`. Errors include `stage` and `requestId`; use Worker → Observability → Logs for details. Protect this public endpoint with rate limiting.
