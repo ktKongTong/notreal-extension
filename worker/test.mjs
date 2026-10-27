@@ -142,3 +142,12 @@ test("reports upstream provenance HTTP errors without caching", async () => {
     console.error = previousError;
   }
 });
+test("reports upstream image HTTP status instead of hiding it", async () => {
+  const previous = globalThis.fetch, logger = console.error;
+  globalThis.fetch = async (_url, options) => { assert.equal(options.redirect, "manual"); return new Response("", { status: 403 }); };
+  console.error = () => {};
+  try {
+    const response = await handler.fetch(request(), env(0.8)), body = await response.json();
+    assert.equal(response.status, 422); assert.equal(body.error, "image_fetch_http_403"); assert.equal(body.stage, "image_download");
+  } finally { globalThis.fetch = previous; console.error = logger; }
+});
