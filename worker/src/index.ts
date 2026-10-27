@@ -160,7 +160,7 @@ async function checkSynthId(env: Env, image: { bytes: Uint8Array; mime: string }
     headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` },
     body: form,
   });
-  if (!response.ok) throw new HttpError(502, "provenance_api_unavailable");
+  if (!response.ok) throw new HttpError(502, `provenance_api_http_${response.status}`);
   const payload = (await response.json()) as {
     results?: { type: string; outcome: string }[];
   };
@@ -175,23 +175,29 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     const pathname = new URL(request.url).pathname;
-    if (pathname === "/health" && request.method === "GET") return json({ ok: true });
+    if (pathname === "/health" && request.method === "GET") return json({ ok: true, version: "diagnostics-v2" });
     if (pathname !== "/detect") return json({ error: "not_found" }, 404);
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
+    const requestId = crypto.randomUUID();
+    let stage = "parse_request";
     try {
       const body = (await request.json().catch(() => null)) as { imageUrl?: unknown } | null;
       if (!body || typeof body.imageUrl !== "string" || body.imageUrl.length > 4096) {
         throw new HttpError(400, "imageUrl_required");
       }
       const url = parseImageUrl(body.imageUrl);
+      stage = "cache_read";
       const key = await cacheKey(url);
       const cached = (await env.CACHE.get(key, "json")) as Detection | null;
       if (cached) return json({ ...cached, cached: true }, 200, "HIT");
 
+      stage = "image_download";
       const image = await downloadImage(url);
+      stage = "style_classification";
       const probability = await classifyStyle(env, image);
       const realistic = probability >= REALISTIC_THRESHOLD;
+      stage = realistic ? "synthid_verification" : "cache_write";
       const detection: Detection = {
         style: {
           label: realistic ? "realistic" : "non_realistic",
@@ -200,12 +206,26 @@ export default {
         synthid: realistic ? await checkSynthId(env, image) : "skipped",
         checkedAt: new Date().toISOString(),
       };
+      stage = "cache_write";
       await env.CACHE.put(key, JSON.stringify(detection), { expirationTtl: CACHE_TTL });
       return json({ ...detection, cached: false }, 200, "MISS");
     } catch (error) {
-      if (error instanceof HttpError) return json({ error: error.message }, error.status);
-      console.error("Image detection failed", error);
-      return json({ error: "detection_failed" }, 502);
+      const message = error instanceof Error ? error.message : String(error);
+      const safeMessage = message.replace(/https?:\\/\\/\\S+/g, "[url]")
+        .replace(/Bearer\\s+\\S+/gi, "Bearer [redacted]").slice(0, 500);
+      console.error({
+        event: "detection_error",
+        requestId,
+        stage,
+        error: error instanceof Error ? error.name : "UnknownError",
+        message: safeMessage,
+      });
+      const status = error instanceof HttpError ? error.status : 502;
+      return json({
+        error: error instanceof HttpError ? error.message : "detection_failed",
+        stage,
+        requestId,
+      }, status);
     }
   },
 };
