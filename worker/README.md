@@ -27,34 +27,38 @@ Response on success:
 - Accepted remote images: public HTTPS PNG, JPEG, WebP, up to 4 MiB; redirects and IP-address hosts are rejected. Requests containing private/signed image URLs should not be sent to this public service.
 - `GET /health` checks the endpoint. The service provides permissive CORS for browser extensions.
 
-## Setup and deploy
+## Deploy
+
+Worker name: `notreal-extension`; public development URL:
+`https://notreal-extension.koft.workers.dev`. Version preview URLs are enabled.
+
+The `CACHE` binding is configured for KV namespace
+`4022b3395e914b438eeea28ab6646845`; you do not need to recreate it.
 
 ```sh
 cd worker
 npm install
 npx wrangler login
-npx wrangler kv namespace create CACHE
-```
-
-Copy the returned namespace ID into `wrangler.jsonc`, replacing the 32 zeroes. Then:
-
-```sh
 npx wrangler secret put OPENAI_API_KEY
-npm run check
+npm run check && npm test
 npm run deploy
+curl -fsS https://notreal-extension.koft.workers.dev/health
 ```
 
-The Cloudflare account must have Workers AI enabled and the OpenAI API organization must have access to Content Provenance checks (an OpenAI 404 can mean missing access). The API key is a Worker secret, never a client-side credential. If you expose this API publicly, configure Cloudflare rate limiting/WAF to avoid third-party abuse of your API quota.
+Expected health response: `{"ok":true}`. A `Hello world` response means that
+Cloudflare is still serving the dashboard scaffold rather than this code.
+Use the exact Worker name `notreal-extension`, not `notreal-detect`.
+
+To deploy with GitHub Actions, set repository secrets `CLOUDFLARE_API_TOKEN`
+and `CLOUDFLARE_ACCOUNT_ID`. The workflow runs tests and a Wrangler dry-run
+on every push, then deploys when both secrets are set. Set
+`OPENAI_API_KEY` separately as a **Cloudflare Worker secret**. Never commit it.
+
+The Cloudflare account must have Workers AI enabled and the OpenAI API
+organization must have access to Content Provenance checks (404 can indicate
+missing access). If the endpoint is public, use Cloudflare rate limiting/WAF
+to protect the Workers AI and OpenAI API quotas.
 
 Cloudflare docs: https://developers.cloudflare.com/workers-ai/models/clef-flash/
 
 OpenAI docs: https://developers.openai.com/api/docs/guides/content-provenance
-
-## GitHub Actions
-
-The `Worker` workflow runs TypeScript checking, offline contract tests, and Wrangler dry-run.
-To enable actual deployment, create repository Actions secrets
-`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and
-`NOTREAL_KV_NAMESPACE_ID` (the real KV namespace ID). Then use
-**Actions → Worker → Run workflow** or push a change under `worker/`.
-Set `OPENAI_API_KEY` separately as a Cloudflare Worker secret; never commit it.
