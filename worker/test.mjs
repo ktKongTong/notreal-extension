@@ -99,3 +99,46 @@ test("realistic images call OpenAI once and share detected watermark", async () 
     globalThis.fetch = previous;
   }
 });
+
+test("reports model failures with a request ID and diagnostic stage", async () => {
+  const previousFetch = globalThis.fetch;
+  const previousError = console.error;
+  const errors = [];
+  globalThis.fetch = async () => image();
+  console.error = (entry) => errors.push(entry);
+  try {
+    const bindings = env(0.8);
+    bindings.AI.run = async () => { throw new Error("mock inference outage"); };
+    const response = await handler.fetch(request(), bindings);
+    assert.equal(response.status, 502);
+    const result = await response.json();
+    assert.equal(result.error, "detection_failed");
+    assert.equal(result.stage, "style_classification");
+    assert.match(result.requestId, /^[\da-f-]{36}$/);
+    assert.equal(errors[0].requestId, result.requestId);
+    assert.equal(errors[0].stage, result.stage);
+    assert.equal(errors[0].message, "mock inference outage");
+  } finally {
+    globalThis.fetch = previousFetch;
+    console.error = previousError;
+  }
+});
+
+test("reports upstream provenance HTTP errors without caching", async () => {
+  const previousFetch = globalThis.fetch;
+  const previousError = console.error;
+  globalThis.fetch = async (url) => String(url) === input ? image() : new Response("rate limited", { status: 429 });
+  console.error = () => {};
+  try {
+    const bindings = env(0.9);
+    const response = await handler.fetch(request(), bindings);
+    assert.equal(response.status, 502);
+    const result = await response.json();
+    assert.equal(result.error, "provenance_api_http_429");
+    assert.equal(result.stage, "synthid_verification");
+    assert.equal(bindings.counts.cacheWrite, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    console.error = previousError;
+  }
+});
