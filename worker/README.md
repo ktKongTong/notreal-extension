@@ -27,32 +27,31 @@ Response on success:
 - Accepted remote images: public HTTPS PNG, JPEG, WebP, up to 4 MiB; redirects and IP-address hosts are rejected. Requests containing private/signed image URLs should not be sent to this public service.
 - `GET /health` checks the endpoint. The service provides permissive CORS for browser extensions.
 
-## Deploy
+## Deploy through Cloudflare (Git integration)
 
-Worker name: `notreal-extension`; public development URL:
-`https://notreal-extension.koft.workers.dev`. Version preview URLs are enabled.
+This repository is deployed by **Cloudflare Workers Builds**, not GitHub Actions.
+For the existing `notreal-extension` Worker, open
+**Cloudflare Dashboard → Workers & Pages → notreal-extension → Settings → Builds**.
+Configure:
 
-The `CACHE` binding is configured for KV namespace
-`4022b3395e914b438eeea28ab6646845`; you do not need to recreate it.
+- **Git repository:** `ktKongTong/notreal-extension`
+- **Production branch:** `main`
+- **Root directory:** `worker` (relative to repository root)
+- **Build command:** leave empty (Wrangler bundles the TypeScript directly)
+- **Deploy command:** `npx wrangler deploy`
+- **Preview command:** use the Cloudflare default, `npx wrangler preview`
 
-```sh
-cd worker
-npm install
-npx wrangler login
-npx wrangler secret put OPENAI_API_KEY
-npm run check && npm test
-npm run deploy
-curl -fsS https://notreal-extension.koft.workers.dev/health
-```
+Save and redeploy the latest commit in Cloudflare Builds. The configuration at
+`worker/wrangler.jsonc` sets the Worker name to `notreal-extension`, enables
+`workers.dev` and preview URLs, binds Workers AI as `AI`, and binds KV as
+`CACHE` with namespace `4022b3395e914b438eeea28ab6646845`.
+Create `OPENAI_API_KEY` under **Settings → Variables and Secrets** on this Worker;
+it is a **runtime secret**, not a build secret, and must not be committed.
 
-Expected health response: `{"ok":true}`. A `Hello world` response means that
-Cloudflare is still serving the dashboard scaffold rather than this code.
-Use the exact Worker name `notreal-extension`, not `notreal-detect`.
-
-To deploy with GitHub Actions, set repository secrets `CLOUDFLARE_API_TOKEN`
-and `CLOUDFLARE_ACCOUNT_ID`. The workflow runs tests and a Wrangler dry-run
-on every push, then deploys when both secrets are set. Set
-`OPENAI_API_KEY` separately as a **Cloudflare Worker secret**. Never commit it.
+After Cloudflare has deployed the revision, check
+`https://notreal-extension.koft.workers.dev/health`.
+The expected response is `{"ok":true}`. A `Hello world` response means the
+Cloudflare dashboard starter Worker is still deployed, not this repository code.
 
 The Cloudflare account must have Workers AI enabled and the OpenAI API
 organization must have access to Content Provenance checks (404 can indicate
