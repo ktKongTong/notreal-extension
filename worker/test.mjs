@@ -35,7 +35,7 @@ const request = () => new Request("https://notreal.test/detect", {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ imageUrl: input }),
 });
-const image = () => new Response(new Uint8Array([137, 80, 78, 71, 1]), {
+const image = () => new Response(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1]), {
   headers: { "content-type": "image/png" },
 });
 test("rejects non-public URLs", async () => {
@@ -176,4 +176,28 @@ test("does not follow redirects to non-public URLs", async () => {
     const response = await handler.fetch(request(), env(0.8));
     assert.equal((await response.json()).error, "public_https_url_required");
   } finally { globalThis.fetch = original; console.error = logger; }
+});
+
+test("detects PNG bytes even with a generic Content-Type", async () => {
+  const previous = globalThis.fetch;
+  globalThis.fetch = async () => new Response(new Uint8Array([137,80,78,71,13,10,26,10,1]), {
+    headers: { "content-type": "application/octet-stream" },
+  });
+  try {
+    const response = await handler.fetch(request(), env(0.05));
+    assert.equal(response.status, 200);
+  } finally { globalThis.fetch = previous; }
+});
+
+test("does not classify an HTML page as an image", async () => {
+  const previous = globalThis.fetch, logger = console.error;
+  globalThis.fetch = async () => new Response("<html>challenge</html>", { headers: { "content-type": "text/html" } });
+  console.error = () => {};
+  try {
+    const response = await handler.fetch(request(), env(0.05));
+    const body = await response.json();
+    assert.equal(response.status, 415);
+    assert.equal(body.error, "unsupported_image_type_text_html");
+    assert.equal(body.stage, "image_download");
+  } finally { globalThis.fetch = previous; console.error = logger; }
 });
