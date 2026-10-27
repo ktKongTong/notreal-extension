@@ -7,7 +7,7 @@
 
   function photoUrl(img) {
     try {
-      const url = new URL(img.currentSrc || img.src);
+      const url = new URL(img.src || img.currentSrc);
       if (url.protocol !== "https:" || url.hostname !== "pbs.twimg.com" ||
           !/^\/media\/[\w-]+(?:\.[\w]+)?$/.test(url.pathname)) return null;
       url.hash = "";
@@ -43,7 +43,8 @@
   function drain() {
     while (active < 2 && queue.length) {
       const { img, url, photo } = queue.shift();
-      if (!img.isConnected || !visible(img) || observed.get(img) !== url) continue;
+      if (!img.isConnected || observed.get(img) !== url) continue;
+      if (!visible(img)) { viewport.observe(img); continue; }
       active++;
       const response = results.get(url) || new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: "NOTREAL_DETECT", imageUrl: url },
