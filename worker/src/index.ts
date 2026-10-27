@@ -85,11 +85,6 @@ async function downloadImage(url: URL): Promise<{ bytes: Uint8Array; mime: strin
   }
   if (!response?.ok) throw new HttpError(422, `image_fetch_http_${response?.status}`);
 
-  const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
-  const mime = contentType === "image/jpg" ? "image/jpeg" : contentType;
-  if (!mime || !["image/png", "image/jpeg", "image/webp"].includes(mime)) {
-    throw new HttpError(415, "unsupported_image_type");
-  }
   if (Number(response.headers.get("content-length")) > MAX_IMAGE_BYTES) {
     throw new HttpError(413, "image_too_large");
   }
@@ -115,6 +110,17 @@ async function downloadImage(url: URL): Promise<{ bytes: Uint8Array; mime: strin
   for (const part of parts) {
     bytes.set(part, offset);
     offset += part.byteLength;
+  }
+  const headerType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "missing";
+  const png = [137, 80, 78, 71, 13, 10, 26, 10];
+  const isPng = png.every((n, i) => bytes[i] === n);
+  const isJpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  const isWebp = [82, 73, 70, 70].every((n, i) => bytes[i] === n) &&
+    [87, 69, 66, 80].every((n, i) => bytes[i + 8] === n);
+  const mime = isPng ? "image/png" : isJpeg ? "image/jpeg" : isWebp ? "image/webp" : null;
+  if (!mime) {
+    const type = headerType.replace(/[^a-z0-9]+/g, "_").slice(0, 40);
+    throw new HttpError(415, `unsupported_image_type_${type}`);
   }
   return { bytes, mime };
 }
