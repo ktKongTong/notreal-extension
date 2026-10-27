@@ -29,3 +29,8 @@ jobs:
       - name: Deploy to Cloudflare
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
         run: npm run deploy
+      - name: Verify workers.dev endpoint
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+        run: |
+          curl --fail-with-body --retry 5 --retry-delay 3 -sS https://notreal-extension.koft.workers.dev/health | tee /tmp/health.json
+          node -e "if (JSON.parse(require('node:fs').readFileSync('/tmp/health.json', 'utf8')).ok !== true) process.exit(1)"
