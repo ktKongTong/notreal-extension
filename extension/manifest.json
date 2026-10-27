@@ -1,16 +1,29 @@
 {
   "manifest_version": 3,
   "name": "NotReal — X Image Provenance",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Flags synthetic, photorealistic images in X posts using SynthID provenance.",
-  "host_permissions": ["https://notreal-extension.koft.workers.dev/*"],
-  "background": { "service_worker": "background.js" },
+  "host_permissions": [
+    "https://notreal-extension.koft.workers.dev/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://x.com/*"],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://x.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "action": {
+    "default_title": "NotReal · X 图片检测"
+  }
 }
