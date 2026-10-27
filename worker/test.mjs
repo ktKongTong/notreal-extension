@@ -151,3 +151,32 @@ test("reports upstream image HTTP status instead of hiding it", async () => {
     assert.equal(response.status, 422); assert.equal(body.error, "image_fetch_http_403"); assert.equal(body.stage, "image_download");
   } finally { globalThis.fetch = previous; console.error = logger; }
 });
+
+test("follows a 307 redirect to an image", async () => {
+  const original = globalThis.fetch, calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push(String(url));
+    assert.equal(options.redirect, "manual");
+    return calls.length === 1
+      ? new Response(null, { status: 307, headers: { location: "/redirected.png" } })
+      : image();
+  };
+  try {
+    const response = await handler.fetch(request(), env(0.05));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).synthid, "skipped");
+    assert.deepEqual(calls, [input, "https://images.example.com/redirected.png"]);
+  } finally { globalThis.fetch = original; }
+});
+
+test("does not follow redirects to non-public URLs", async () => {
+  const original = globalThis.fetch, logger = console.error;
+  globalThis.fetch = async () => new Response(null, {
+    status: 307, headers: { location: "http://127.0.0.1/private.png" },
+  });
+  console.error = () => {};
+  try {
+    const response = await handler.fetch(request(), env(0.8));
+    assert.equal((await response.json()).error, "public_https_url_required");
+  } finally { globalThis.fetch = original; console.error = logger; }
+});
