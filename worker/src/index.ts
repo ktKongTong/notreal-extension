@@ -71,10 +71,10 @@ async function cacheKey(url: URL): Promise<string> {
 
 async function downloadImage(url: URL): Promise<{ bytes: Uint8Array; mime: string }> {
   const response = await fetch(url.href, {
-    redirect: "error",
+    redirect: "manual",
     headers: { Accept: "image/png,image/jpeg,image/webp" },
   });
-  if (!response.ok) throw new HttpError(422, "image_fetch_failed");
+  if (!response.ok) throw new HttpError(422, `image_fetch_http_${response.status}`);
 
   const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
   const mime = contentType === "image/jpg" ? "image/jpeg" : contentType;
