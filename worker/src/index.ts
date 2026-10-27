@@ -211,8 +211,8 @@ export default {
       return json({ ...detection, cached: false }, 200, "MISS");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const safeMessage = message.replace(/https?:\\/\\/\\S+/g, "[url]")
-        .replace(/Bearer\\s+\\S+/gi, "Bearer [redacted]").slice(0, 500);
+      const safeMessage = message.replace(/https?:\/\/\S+/g, "[url]")
+        .replace(/Bearer\s+\S+/gi, "Bearer [redacted]").slice(0, 500);
       console.error({
         event: "detection_error",
         requestId,
