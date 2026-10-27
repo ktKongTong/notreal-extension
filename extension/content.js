@@ -1,9 +1,13 @@
 (() => {
-  const PHOTO_SELECTOR = 'article [data-testid="tweetPhoto"] img';
+  const SELECTOR = 'article img[src*="pbs.twimg.com/media/"]';
   const observed = new WeakMap();
   const results = new Map();
   const queue = [];
+  const stats = { found: 0, sent: 0, marked: 0 };
   let active = 0;
+
+  const report = () => chrome.runtime.sendMessage({ type: "NOTREAL_STATUS", stats },
+    () => { void chrome.runtime.lastError; });
 
   function photoUrl(img) {
     try {
@@ -17,10 +21,13 @@
   }
 
   function candidate(img) {
-    const photo = img.closest('[data-testid="tweetPhoto"]');
-    if (!photo?.closest("article") || photo.closest('[data-testid="videoPlayer"], [data-testid="videoComponent"]')) return null;
+    if (!(img instanceof HTMLImageElement) || !img.closest("article") ||
+        img.closest('[data-testid="videoPlayer"], [data-testid="videoComponent"], a[href*="/video/"]')) return null;
     const url = photoUrl(img);
-    return url ? { photo, url } : null;
+    if (!url) return null;
+    const photo = img.closest('[data-testid="tweetPhoto"]') ||
+      img.closest('a[href*="/photo/"]') || img.parentElement;
+    return photo ? { photo, url } : null;
   }
 
   function mark(photo) {
@@ -30,32 +37,48 @@
     const badge = document.createElement("span");
     badge.className = "notreal-label";
     badge.textContent = "✦ AI 生成";
-    badge.title = "检测到 SynthID 水印，图片具有现实风格";
+    badge.title = "已检测到 SynthID，图片具有现实风格";
     photo.append(badge);
+    stats.marked++;
+    report();
   }
 
   function visible(img) {
-    const rect = img.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 &&
-      rect.top < innerHeight && rect.left < innerWidth;
+    const r = img.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 &&
+      r.top < innerHeight && r.left < innerWidth;
   }
 
   function drain() {
     while (active < 2 && queue.length) {
-      const { img, url, photo } = queue.shift();
-      if (!img.isConnected || observed.get(img) !== url) continue;
+      const { img, photo, url } = queue.shift();
+      if (!img.isConnected || observed.get(img)?.url !== url) continue;
       if (!visible(img)) { viewport.observe(img); continue; }
       active++;
-      const response = results.get(url) || new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: "NOTREAL_DETECT", imageUrl: url },
-          (result) => resolve(chrome.runtime.lastError ? null : result));
-      });
-      results.set(url, response);
-      response.then((result) => {
-        if (!result || result.error) { results.delete(url); return; }
-        if (img.isConnected && photo.contains(img) && observed.get(img) === url &&
-            result.style?.label === "realistic" && result.synthid === "detected") mark(photo);
-        if (results.size > 500) results.delete(results.keys().next().value);
+      let result = results.get(url);
+      if (!result) {
+        stats.sent++;
+        report();
+        console.info("[NotReal] Detect visible photo", new URL(url).pathname);
+        result = new Promise((resolve) => chrome.runtime.sendMessage(
+          { type: "NOTREAL_DETECT", imageUrl: url },
+          (reply) => {
+            const error = chrome.runtime.lastError;
+            resolve(error ? { error: error.message } : reply ?? { error: "empty_response" });
+          }
+        ));
+        results.set(url, result);
+      }
+      result.then((data) => {
+        if (data.error) {
+          results.delete(url);
+          console.warn("[NotReal] Detection error", data.error, data.detail ?? "");
+          return;
+        }
+        console.info("[NotReal] Detection complete", { style: data.style?.label, synthid: data.synthid, cached: data.cached });
+        if (img.isConnected && photo.contains(img) && observed.get(img)?.url === url &&
+            data.style?.label === "realistic" && data.synthid === "detected") mark(photo);
+        if (results.size > 300) results.delete(results.keys().next().value);
       }).finally(() => { active--; drain(); });
     }
   }
@@ -65,36 +88,43 @@
       if (!entry.isIntersecting) continue;
       viewport.unobserve(entry.target);
       const item = candidate(entry.target);
-      if (item && observed.get(entry.target) === item.url) {
+      if (item && observed.get(entry.target)?.url === item.url)
         queue.push({ img: entry.target, ...item });
-      }
     }
     drain();
-  }, { threshold: 0.1 });
+  }, { threshold: 0.01 });
 
   function track(img) {
     const item = candidate(img);
-    const url = item?.url;
-    if (observed.get(img) === url) return;
-    const photo = img.closest('[data-testid="tweetPhoto"]');
-    photo?.classList.remove("notreal-ai-photo");
-    photo?.querySelector(":scope > .notreal-label")?.remove();
-    observed.set(img, url);
+    const previous = observed.get(img);
+    if (previous?.url === item?.url && previous?.photo === item?.photo) return;
+    previous?.photo.classList.remove("notreal-ai-photo");
+    previous?.photo.querySelector(":scope > .notreal-label")?.remove();
     viewport.unobserve(img);
-    if (url) viewport.observe(img);
+    observed.set(img, item);
+    if (item) {
+      stats.found++;
+      if (stats.found <= 5) console.info("[NotReal] X post photo found", new URL(item.url).pathname);
+      viewport.observe(img);
+      report();
+    }
   }
 
   function scan(node) {
     if (!(node instanceof Element)) return;
-    if (node.matches(PHOTO_SELECTOR)) track(node);
-    node.querySelectorAll(PHOTO_SELECTOR).forEach(track);
+    if (node.matches(SELECTOR)) track(node);
+    node.querySelectorAll(SELECTOR).forEach(track);
   }
 
-  scan(document.body);
+  console.info("[NotReal] X adapter active (v0.1.1)");
+  report();
+  scan(document.documentElement);
   new MutationObserver((changes) => {
     for (const change of changes) {
       if (change.type === "attributes") track(change.target);
       else for (const node of change.addedNodes) scan(node);
     }
-  }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "srcset"] });
+  }).observe(document.documentElement, {
+    childList: true, subtree: true, attributes: true, attributeFilter: ["src", "srcset"],
+  });
 })();
