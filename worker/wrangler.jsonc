@@ -4,23 +4,9 @@
   "compatibility_date": "2026-10-27",
   "workers_dev": true,
   "preview_urls": true,
-  "ai": {
-    "binding": "AI"
-  },
-  "kv_namespaces": [
-    {
-      "binding": "CACHE",
-      "id": "4022b3395e914b438eeea28ab6646845"
-    }
-  ],
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1
-  },
-  "secrets": {
-    "required": [
-      "OPENAI_API_KEY"
-    ]
-  },
+  "ai": { "binding": "AI" },
+  "kv_namespaces": [{ "binding": "CACHE", "id": "4022b3395e914b438eeea28ab6646845" }],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "secrets": { "required": ["OPENAI_API_KEY"] },
   "keep_vars": true
 }
