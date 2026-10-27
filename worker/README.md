@@ -49,3 +49,12 @@ The Cloudflare account must have Workers AI enabled and the OpenAI API organizat
 Cloudflare docs: https://developers.cloudflare.com/workers-ai/models/clef-flash/
 
 OpenAI docs: https://developers.openai.com/api/docs/guides/content-provenance
+
+## GitHub Actions
+
+The `Worker` workflow runs TypeScript checking, offline contract tests, and Wrangler dry-run.
+To enable actual deployment, create repository Actions secrets
+`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and
+`NOTREAL_KV_NAMESPACE_ID` (the real KV namespace ID). Then use
+**Actions → Worker → Run workflow** or push a change under `worker/`.
+Set `OPENAI_API_KEY` separately as a Cloudflare Worker secret; never commit it.
