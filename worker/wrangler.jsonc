@@ -16,5 +16,11 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
-  }
+  },
+  "secrets": {
+    "required": [
+      "OPENAI_API_KEY"
+    ]
+  },
+  "keep_vars": true
 }
