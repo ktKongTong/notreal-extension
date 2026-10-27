@@ -108,13 +108,10 @@ test("X adapter only sends visible photos, never video posters or card images", 
     image.matches = () => true;
     return image;
   });
-  const document = {
-    documentElement: {
-      matches: () => false,
-      querySelectorAll: () => images,
-    },
-    createElement: () => ({ className: "", textContent: "" }),
-  };
+  const root = new Element();
+  root.matches = () => false;
+  root.querySelectorAll = () => images;
+  const document = { documentElement: root, createElement: () => ({ className: "", textContent: "" }) };
   const chrome = {
     runtime: {
       sendMessage: (msg, cb) => {
