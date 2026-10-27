@@ -1,23 +1,24 @@
 # NotReal Chrome extension — X.com
 
-Manifest V3, no build step, no login. Detects **visible post media images**, not avatars, video posters, or card images. Only adds a badge if the Cloudflare Worker returns both `style.label: "realistic"` and `synthid: "detected"`.
+Manifest V3, no build step and no login. Only visible post photos are sent for inspection. Avatars, videos/GIF posters, video controls and card thumbnails are excluded. A badge appears only if the Worker returns both `realistic` and `synthid: detected`.
 
 ## Install
 
-1. Download the repo, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
-2. Select the repository's `extension/` directory (the folder with `manifest.json`).
-3. **Reload the extension and reload any existing X tabs** whenever its source changes.
-4. Pin NotReal to the Chrome toolbar. On X, the extension icon shows a small **X badge** when the adapter is active; hover it to see counts for images found, detection requests, and marked images.
+1. Open `chrome://extensions`, enable Developer mode → **Load unpacked** → select `extension/`.
+2. After updates, reload the extension **and** existing X tabs.
+3. Pin NotReal to Chrome's toolbar. The **X** badge confirms the adapter is running. Hover for scanned/requested/marked counts.
+
+## Caching
+
+- Browser: `chrome.storage.local`, seven days from the Worker's `checkedAt`, shared across tabs and browser restarts. Caches `detected`, `not_detected`, and `skipped`; errors are never cached.
+- Server: existing Workers KV shared by all anonymous users. Requests with identical image URLs are coalesced.
+- Only photos within the current viewport are queued, with at most two active requests per tab.
 
 ## Troubleshooting
 
-The detection POST is sent from the **extension's background service worker**. It does **not** appear in the X tab's Network panel.
+- In the X tab Console, filter `[NotReal]` to see photos found, requests sent and results.
+- Actual POST `/detect` appears in **chrome://extensions → NotReal → Service Worker → Inspect → Network**, not the X tab's Network.
+- No X badge: reload extension and tab. Badge but no photos: X's DOM may have changed or visible media is video/card content.
+- `node --test extension/test.mjs` checks cache reuse and video/card filtering in simulated environments.
 
-- On X, open DevTools → Console, filter `[NotReal]`. Expect `X adapter active`, `X post photo found`, `Detect visible photo`, then `Detection complete` or `Detection error`.
-- To inspect actual `/detect` network requests, visit `chrome://extensions` → NotReal → **Service Worker → Inspect → Network**.
-- No X toolbar badge: script not injected / extension not reloaded.
-- X badge but zero images found: X has changed the DOM, or no eligible post media images are present.
-- Image found but no detection: only visible images are processed; check viewport.
-- Detection successful but no badge: only realistic images with detected SynthID watermarks are marked, never `not_detected` or `skipped`.
-
-The endpoint is `https://notreal-extension.koft.workers.dev/detect` and is configured in `background.js`. Adapter uses `article` media images from `pbs.twimg.com/media/`, supports X's `tweetPhoto` and photo-link wrappers, and limits concurrency to two images.
+Endpoint: `https://notreal-extension.koft.workers.dev/detect`. No changes to the Worker are required.
