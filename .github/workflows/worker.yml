@@ -25,6 +25,7 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run check
+      - run: npm test
       - run: npx wrangler deploy --dry-run
       - name: Deploy to Cloudflare
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' && env.KV_NAMESPACE_ID != '' }}
